@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Read Aloud — E-Book Reader</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root {
+    --bg: #1a1410;
+    --panel: #261d17;
+    --ink: #f4ead5;
+    --muted: #a89684;
+    --accent: #d4a574;
+    --accent-hot: #e8b888;
+    --border: #3a2d24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Georgia, 'Times New Roman', serif;
+    min-height: 100vh;
+    padding: 16px;
+    line-height: 1.6;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  header {
+    text-align: center;
+    padding: 12px 0 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-size: 28px;
+    letter-spacing: 0.5px;
+    color: var(--accent);
+    font-weight: normal;
+  }
+  .sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+  .upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 32px 20px;
+    text-align: center;
+    background: var(--panel);
+    margin-bottom: 20px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .upload-area:hover { border-color: var(--accent); }
+  .upload-area input { display: none; }
+  .upload-icon { font-size: 36px; margin-bottom: 8px; }
+  .upload-text { color: var(--ink); font-size: 16px; }
+  .upload-hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+  .or {
+    text-align: center;
+    color: var(--muted);
+    margin: 16px 0;
+    font-size: 14px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 140px;
+    padding: 14px;
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 15px;
+    resize: vertical;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+
+  .controls {
+    background: var(--panel);
+    padding: 16px;
+    border-radius: 12px;
+    margin-top: 16px;
+    border: 1px solid var(--border);
+  }
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  button {
+    flex: 1;
+    min-width: 80px;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { background: var(--accent-hot); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--border);
+  }
+
+  .slider-row {
+    margin-bottom: 12px;
+  }
+  .slider-row label {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+  select {
+    width: 100%;
+    padding: 10px;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+  }
+
+  .status {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 10px;
+    min-height: 18px;
+  }
+
+  .reading-area {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 16px;
+    line-height: 1.8;
+  }
+  .word-highlight {
+    background: var(--accent);
+    color: var(--bg);
+    padding: 0 3px;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Read Aloud</h1>
+    <div class="sub">Drop a PDF or text file. Hit play. Listen.</div>
+  </header>
+
+  <label class="upload-area" for="fileInput">
+    <div class="upload-icon">📖</div>
+    <div class="upload-text">Tap to upload a file</div>
+    <div class="upload-hint">PDF or .txt</div>
+    <input type="file" id="fileInput" accept=".pdf,.txt,text/plain,application/pdf">
+  </label>
+
+  <div class="or">— or paste text below —</div>
+
+  <textarea id="textInput" placeholder="Paste any text here..."></textarea>
+
+  <div class="controls">
+    <div class="btn-row">
+      <button id="playBtn">▶ Play</button>
+      <button id="pauseBtn" class="secondary" disabled>⏸ Pause</button>
+      <button id="stopBtn" class="secondary" disabled>⏹ Stop</button>
+    </div>
+
+    <div class="slider-row">
+      <label>Speed <span id="speedVal">1.0x</span></label>
+      <input type="range" id="speed" min="0.5" max="2" step="0.1" value="1">
+    </div>
+
+    <div class="slider-row">
+      <label>Voice</label>
+      <select id="voiceSelect"></select>
+    </div>
+
+    <div class="status" id="status">Ready</div>
+  </div>
+
+  <div class="reading-area" id="readingArea" style="display:none;"></div>
+</div>
+
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const textInput = document.getElementById('textInput');
+  const playBtn = document.getElementById('playBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const speedSlider = document.getElementById('speed');
+  const speedVal = document.getElementById('speedVal');
+  const voiceSelect = document.getElementById('voiceSelect');
+  const statusEl = document.getElementById('status');
+  const readingArea = document.getElementById('readingArea');
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  let voices = [];
+  let currentUtterance = null;
+
+  function loadVoices() {
+    const allVoices = speechSynthesis.getVoices();
+    // English and Spanish voices only
+    voices = allVoices.filter(v => {
+      const lang = (v.lang || '').toLowerCase();
+      return lang.startsWith('en') || lang.startsWith('es');
+    });
+    voiceSelect.innerHTML = '';
+    if (voices.length === 0) {
+      const opt = document.createElement('option');
+      opt.textContent = 'Default voice';
+      voiceSelect.appendChild(opt);
+      return;
+    }
+    voices.forEach((v, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      const flag = v.lang.toLowerCase().startsWith('es') ? '🇪🇸' : '🇺🇸';
+      opt.textContent = `${flag} ${v.name} (${v.lang})`;
+      // Prefer US English as default
+      if (v.lang === 'en-US' && !voiceSelect.value) opt.selected = true;
+      voiceSelect.appendChild(opt);
+    });
+  }
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+
+  speedSlider.oninput = () => {
+    speedVal.textContent = parseFloat(speedSlider.value).toFixed(1) + 'x';
+  };
+
+  fileInput.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    statusEl.textContent = 'Reading file...';
+    try {
+      if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+        let text = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+
+          // Sort items by reading order: top-to-bottom, then left-to-right
+          // PDF Y coordinates go bottom-up, so we flip them
+          const items = content.items.filter(it => it.str && it.str.trim().length > 0);
+          items.forEach(it => {
+            it._y = -it.transform[5]; // flip Y so top of page is smallest
+            it._x = it.transform[4];
+          });
+
+          // Group items into lines (items within 5 units vertically = same line)
+          const lineThreshold = 5;
+          items.sort((a, b) => a._y - b._y);
+          const lines = [];
+          let currentLine = [];
+          let currentY = null;
+          for (const it of items) {
+            if (currentY === null || Math.abs(it._y - currentY) <= lineThreshold) {
+              currentLine.push(it);
+              if (currentY === null) currentY = it._y;
+            } else {
+              lines.push(currentLine);
+              currentLine = [it];
+              currentY = it._y;
+            }
+          }
+          if (currentLine.length > 0) lines.push(currentLine);
+
+          // Sort each line left-to-right and join
+          const pageText = lines.map(line => {
+            line.sort((a, b) => a._x - b._x);
+            return line.map(it => it.str).join(' ');
+          }).join('\n');
+
+          text += pageText + '\n\n';
+          statusEl.textContent = `Reading page ${i} of ${pdf.numPages}...`;
+        }
+
+        // Clean up: fix hyphenated line breaks, collapse extra whitespace
+        text = text
+          .replace(/-\n([a-z])/g, '$1')   // join hyphenated words
+          .replace(/([a-z,])\n([a-z])/g, '$1 $2')  // join broken sentences
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\n{3,}/g, '\n\n');
+
+        textInput.value = text.trim();
+        statusEl.textContent = `Loaded ${pdf.numPages} pages. Hit play.`;
+      } else {
+        const text = await file.text();
+        textInput.value = text;
+        statusEl.textContent = 'File loaded. Hit play.';
+      }
+    } catch (err) {
+      statusEl.textContent = 'Error: ' + err.message;
+    }
+  };
+
+  function speak() {
+    const text = textInput.value.trim();
+    if (!text) {
+      statusEl.textContent = 'No text to read.';
+      return;
+    }
+
+    speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = parseFloat(speedSlider.value);
+    const voiceIdx = parseInt(voiceSelect.value);
+    if (!isNaN(voiceIdx) && voices[voiceIdx]) {
+      utterance.voice = voices[voiceIdx];
+    }
+
+    readingArea.style.display = 'block';
+    readingArea.textContent = text;
+
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        const before = text.substring(0, event.charIndex);
+        const wordEnd = text.indexOf(' ', event.charIndex);
+        const word = text.substring(event.charIndex, wordEnd === -1 ? text.length : wordEnd);
+        const after = text.substring(wordEnd === -1 ? text.length : wordEnd);
+        readingArea.innerHTML = escapeHtml(before) +
+          '<span class="word-highlight">' + escapeHtml(word) + '</span>' +
+          escapeHtml(after);
+        const highlight = readingArea.querySelector('.word-highlight');
+        if (highlight) {
+          highlight.scrollIntoView({block: 'center', behavior: 'smooth'});
+        }
+      }
+    };
+
+    utterance.onstart = () => {
+      statusEl.textContent = 'Reading...';
+      playBtn.disabled = true;
+      pauseBtn.disabled = false;
+      stopBtn.disabled = false;
+    };
+    utterance.onend = () => {
+      statusEl.textContent = 'Finished.';
+      playBtn.disabled = false;
+      pauseBtn.disabled = true;
+      stopBtn.disabled = true;
+      readingArea.textContent = text;
+    };
+    utterance.onerror = (e) => {
+      statusEl.textContent = 'Error: ' + e.error;
+      playBtn.disabled = false;
+      pauseBtn.disabled = true;
+      stopBtn.disabled = true;
+    };
+
+    currentUtterance = utterance;
+    speechSynthesis.speak(utterance);
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  playBtn.onclick = () => {
+    if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+      statusEl.textContent = 'Reading...';
+      playBtn.disabled = true;
+      pauseBtn.disabled = false;
+    } else {
+      speak();
+    }
+  };
+
+  pauseBtn.onclick = () => {
+    speechSynthesis.pause();
+    statusEl.textContent = 'Paused.';
+    playBtn.disabled = false;
+    pauseBtn.disabled = true;
+  };
+
+  stopBtn.onclick = () => {
+    speechSynthesis.cancel();
+    statusEl.textContent = 'Stopped.';
+    playBtn.disabled = false;
+    pauseBtn.disabled = true;
+    stopBtn.disabled = true;
+    readingArea.textContent = textInput.value;
+  };
+</script>
+</body>
+</html>
