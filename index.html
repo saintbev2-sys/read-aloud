@@ -375,6 +375,10 @@
     };
 
     currentUtterance = utterance;
+    // Enable stop/pause IMMEDIATELY, don't wait for onstart event
+    pauseBtn.disabled = false;
+    stopBtn.disabled = false;
+    playBtn.disabled = true;
     speechSynthesis.speak(utterance);
   }
 
@@ -401,7 +405,10 @@
   };
 
   stopBtn.onclick = () => {
+    // Force kill — call cancel multiple times to handle iOS quirks
     speechSynthesis.cancel();
+    setTimeout(() => speechSynthesis.cancel(), 100);
+    setTimeout(() => speechSynthesis.cancel(), 300);
     statusEl.textContent = 'Stopped.';
     playBtn.disabled = false;
     pauseBtn.disabled = true;
